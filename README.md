@@ -198,3 +198,219 @@ Algunas ideas que se me ocurren que podrían implementar son:
 - Implementar Airflow con ejecutores de Celery y [Flower](https://airflow.apache.org/docs/apache-airflow/stable/security/flower.html).
 - Reemplazar MLflow con [Seldon-Core](https://github.com/SeldonIO/seldon-core).
 - Agregar un servicio de tableros como, por ejemplo, [Grafana](https://grafana.com).
+
+
+
+# Predicción de Precios de Vehículos Usados - Implementación MLOps
+
+Este proyecto implementa un sistema completo de MLOps para un modelo predictivo de precios de vehículos usados en el mercado automotor de India. El sistema utiliza Apache Airflow para la orquestación, MLflow para el seguimiento de experimentos, y FastAPI para servir el modelo como una API REST.
+
+## Tabla de Contenidos
+- [Arquitectura](#arquitectura)
+- [Componentes](#componentes)
+- [Instalación y Configuración](#instalación-y-configuración)
+- [Uso del Sistema](#uso-del-sistema)
+- [API Reference](#api-reference)
+- [Ciclo de Vida del Modelo](#ciclo-de-vida-del-modelo)
+- [Contribuciones](#contribuciones)
+
+## Arquitectura
+
+El sistema implementa una arquitectura MLOps completa con los siguientes componentes:
+
+![Diagrama de Arquitectura](final_assign.png)
+
+### Flujo de Datos
+1. Los datos de vehículos se almacenan en un bucket de MinIO (simulando un data lake en S3)
+2. Apache Airflow orquesta el proceso ETL, entrenamiento y registro del modelo
+3. MLflow registra experimentos, métricas y modelos
+4. FastAPI sirve el modelo en producción mediante una API REST
+
+## Componentes
+
+### 1. Orquestación con Apache Airflow
+- DAG para carga de datos
+- DAG para preprocesamiento
+- DAG para entrenamiento y evaluación del modelo
+- DAG para registro y despliegue del modelo
+
+### 2. Tracking de Experimentos con MLflow
+- Registro de parámetros del modelo
+- Seguimiento de métricas de rendimiento
+- Almacenamiento de artefactos del modelo
+- Gestión de versiones del modelo
+
+### 3. Servicio de Predicción con FastAPI
+- API REST para predicción individual y por lotes
+- Validación de datos con Pydantic
+- Documentación automática con Swagger/OpenAPI
+- Gestión de errores y monitoreo
+
+### 4. Almacenamiento con MinIO
+- Bucket para datos de entrada
+- Bucket para artefactos de MLflow
+- Simulación de un data lake en S3
+
+## Instalación y Configuración
+
+### Prerrequisitos
+- Docker y Docker Compose
+- Git
+
+### Pasos de Instalación
+
+1. Clonar el repositorio:
+```bash
+git clone https://github.com/tu-usuario/amq2-service-ml.git
+cd amq2-service-ml
+```
+
+2. Crear estructura de directorios:
+```bash
+mkdir -p airflow/{dags,logs,plugins,config,secrets}
+```
+
+3. Configurar variables de entorno:
+```bash
+# En Linux/MacOS, ajustar UID
+echo "AIRFLOW_UID=$(id -u)" >> .env
+```
+
+4. Iniciar los servicios:
+```bash
+docker compose --profile all up -d
+```
+
+5. Verificar que todos los servicios estén funcionando:
+```bash
+docker ps
+```
+
+## Uso del Sistema
+
+### Subir datos al Data Lake
+1. Acceder a la interfaz de MinIO: http://localhost:9001
+2. Credenciales: minio / minio123
+3. Subir el archivo `car_details_v3.csv` al bucket `data`
+
+### Ejecutar el Pipeline en Airflow
+1. Acceder a la interfaz de Airflow: http://localhost:8080
+2. Credenciales: airflow / airflow
+3. Activar y ejecutar el DAG `vehicle_price_prediction`
+
+### Examinar Experimentos en MLflow
+1. Acceder a la interfaz de MLflow: http://localhost:5001
+2. Revisar el experimento `vehicle_price_prediction`
+3. Comparar métricas entre diferentes ejecuciones
+
+### Realizar Predicciones con la API
+1. Acceder a la documentación de la API: http://localhost:8800/docs
+2. Probar el endpoint `/predict` con un ejemplo:
+```json
+{
+  "year": 2015,
+  "km_driven": 40000,
+  "fuel": "Diesel",
+  "seller_type": "Individual",
+  "transmission": "Manual",
+  "owner_rank": 1,
+  "mileage_kmpl": 23.0,
+  "engine_cc": 1498,
+  "max_power_bhp": 98.6,
+  "seats": 5,
+  "brand": "Maruti",
+  "torque_nm": 200,
+  "torque_rpm": 2000
+}
+```
+
+## API Reference
+
+### Endpoints
+
+#### GET /
+- Descripción: Información básica sobre la API
+- Respuesta: Status e información del modelo
+
+#### GET /health
+- Descripción: Verificación de estado del servicio
+- Respuesta: Estado del servicio y modelo
+
+#### GET /model/info
+- Descripción: Información detallada sobre el modelo en producción
+- Respuesta: Nombre, versión, framework y características del modelo
+
+#### POST /predict
+- Descripción: Predicción para un vehículo individual
+- Request: Características del vehículo (ver modelo `CarFeatures`)
+- Respuesta: Precio predicho en rupias
+
+#### POST /predict/batch
+- Descripción: Predicción para múltiples vehículos
+- Request: Array de características de vehículos
+- Respuesta: Array de precios predichos
+
+### Modelos de Datos
+
+#### CarFeatures
+```json
+{
+  "year": int,                 // Año del vehículo (1950-2025)
+  "km_driven": int,            // Kilómetros recorridos
+  "fuel": string,              // Tipo de combustible (Petrol, Diesel, CNG, LPG)
+  "seller_type": string,       // Tipo de vendedor (Individual, Dealer, Trustmark Dealer)
+  "transmission": string,      // Tipo de transmisión (Manual, Automatic)
+  "owner_rank": int,           // Rango del propietario (1-5)
+  "mileage_kmpl": float,       // Rendimiento de combustible (km/l)
+  "engine_cc": float,          // Cilindrada del motor (cc)
+  "max_power_bhp": float,      // Potencia máxima (bhp)
+  "seats": int,                // Número de asientos (2-10)
+  "brand": string,             // Marca del vehículo
+  "torque_nm": float,          // [Opcional] Torque (Nm)
+  "torque_rpm": float          // [Opcional] RPM del torque
+}
+```
+
+## Ciclo de Vida del Modelo
+
+### 1. Obtención y Preprocesamiento de Datos
+- Los datos provienen de un dataset público de CarDekho
+- Se realiza limpieza, transformación y feature engineering
+- Se normalizan variables numéricas y se codifican variables categóricas
+
+### 2. Entrenamiento y Experimentación
+- Se prueban diferentes configuraciones de hiperparámetros de XGBoost
+- Se implementa validación cruzada y evaluación del rendimiento
+- Se registran experimentos con MLflow
+
+### 3. Evaluación del Modelo
+- Métricas principales: MAE (Error Absoluto Medio) y R² (Coeficiente de Determinación)
+- Análisis de importancia de características
+- Validación del rendimiento en conjuntos de prueba
+
+### 4. Registro y Despliegue
+- El mejor modelo se registra en MLflow Model Registry
+- Se promociona la versión ganadora a "Producción"
+- Se despliega mediante la API REST de FastAPI
+
+### 5. Monitoreo y Actualización
+- La API incluye endpoints para verificar el estado y obtener información del modelo
+- Airflow puede programarse para reentrenar periódicamente el modelo
+- MLflow mantiene un historial de versiones para facilitar la reversión si es necesario
+
+## Contribuciones
+
+Este proyecto fue desarrollado como parte del curso de MLOps de la CEIA-FIUBA.
+
+Autores originales del modelo:
+- Federico Martin Zoya (a1828)
+- Nicolas Pinzon Aparicio (a1820)
+- Daniel Fernando Peña Pinzon (a1818)
+- Cesar Raúl Alan Cruz Gutierrez (2544003)
+
+Para contribuir:
+1. Haz un fork del repositorio
+2. Crea una rama para tu característica (`git checkout -b feature/nueva-funcionalidad`)
+3. Realiza tus cambios y haz commit (`git commit -m 'Añadir nueva funcionalidad'`)
+4. Haz push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Abre un Pull Request

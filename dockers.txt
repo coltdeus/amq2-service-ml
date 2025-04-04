@@ -1,0 +1,51 @@
+// airflow
+FROM apache/airflow:2.8.1
+
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+         git \
+  && apt-get autoremove -yqq --purge \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+COPY requirements.txt /requirements.txt
+
+RUN pip install --user --upgrade pip
+RUN pip install --no-cache-dir --user apache-airflow[virtualenv]==2.8.1 -r /requirements.txt
+
+// fastapi
+FROM python:3.8-slim
+
+WORKDIR /app
+COPY . .
+COPY requirements.txt /requirements.txt
+
+RUN apt-get update && apt-get install -y curl
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r /requirements.txt
+
+EXPOSE 8800
+
+// mlflow
+FROM python:3.11-slim
+
+COPY requirements.txt /requirements.txt
+RUN apt-get update && apt-get install -y wget
+RUN pip install --upgrade pip
+RUN pip install mlflow[extras] psycopg2-binary boto3 cryptography pymysql
+RUN pip install --no-cache-dir -r /requirements.txt
+
+EXPOSE 5000
+
+// postgres
+FROM postgres:latest
+
+# The official recommendation for creating multiple databases is as follows:
+# If you would like to do additional initialization in an image derived from this one, add one or more
+# *.sql, *.sql.gz, or *.sh scripts under /docker-entrypoint-initdb.d (creating the directory if necessary).
+# After the entrypoint calls initdb to create the default postgres user and database, it will run any *.sql files
+# and source any *.sh scripts found in that directory to do further initialization before starting the service.
+
+COPY mlflow.sql /docker-entrypoint-initdb.d/
